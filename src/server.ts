@@ -1,4 +1,5 @@
 import express from 'express';
+import { pool } from './db';
 
 const app = express();
 const port = 3000;
@@ -41,9 +42,25 @@ function validateNoteBody(title: unknown, content: unknown): ValidateNoteResult 
     return { ok: true, title: normalizedTitle, content: normalizedContent };
 }
 
-app.get('/health', (req, res) => {
-    res.json({ message: 'OK' });
-});
+
+app.get('/health', async (_req, res) => {
+    try {
+      const result = await pool.query('SELECT NOW()');
+  
+      return res.status(200).json({
+        status: 'success',
+        data: result.rows,
+      });
+    } catch (error) {
+      console.error(error);
+  
+      return res.status(500).json({
+        status: 'error',
+        message: 'Database connection failed',
+      });
+    }
+  });
+  
 
 app.get('/notes', (req, res) => {
     return res.json({
