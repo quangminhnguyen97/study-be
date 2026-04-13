@@ -2,7 +2,11 @@ import express from 'express';
 import { pool } from './db';
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT ?? 3000;
+
+pool.on('error', (err) => {
+    console.error('Unexpected pg pool error:', err);
+});
 
 app.use(express.json());
 
@@ -11,7 +15,6 @@ const notes = [
     { id: 2, title: 'Note 2', content: 'Learn Routing' },
 ];
 
-/** Trả về id dạng số nguyên hoặc null nếu param không hợp lệ */
 function parseNoteIdParam(id: string | undefined): number | null {
     if (id === undefined) return null;
     const noteId = Number(id);
@@ -62,10 +65,12 @@ app.get('/health', async (_req, res) => {
   });
   
 
-app.get('/notes', (req, res) => {
+app.get('/notes', async (_req, res) => {
+    const result = await pool.query('SELECT * FROM notes');
+    console.log(result.rows);
     return res.json({
         status: 'success',
-        data: notes,
+        data: result.rows,
     });
 });
 
