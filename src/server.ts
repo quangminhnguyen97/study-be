@@ -48,22 +48,22 @@ function validateNoteBody(title: unknown, content: unknown): ValidateNoteResult 
 
 app.get('/health', async (_req, res) => {
     try {
-      const result = await pool.query('SELECT NOW()');
-  
-      return res.status(200).json({
-        status: 'success',
-        data: result.rows,
-      });
+        const result = await pool.query('SELECT NOW()');
+
+        return res.status(200).json({
+            status: 'success',
+            data: result.rows,
+        });
     } catch (error) {
-      console.error(error);
-  
-      return res.status(500).json({
-        status: 'error',
-        message: 'Database connection failed',
-      });
+        console.error(error);
+
+        return res.status(500).json({
+            status: 'error',
+            message: 'Database connection failed',
+        });
     }
-  });
-  
+});
+
 
 app.get('/notes', async (_req, res) => {
     const result = await pool.query('SELECT * FROM notes');
@@ -74,7 +74,7 @@ app.get('/notes', async (_req, res) => {
     });
 });
 
-app.get('/notes/:id', (req, res) => {
+app.get('/notes/:id', async (req, res) => {
     const noteId = parseNoteIdParam(req.params.id);
 
     if (noteId === null) {
@@ -84,9 +84,10 @@ app.get('/notes/:id', (req, res) => {
         });
     }
 
-    const note = notes.find((n) => n.id === noteId);
+    const result = await pool.query('SELECT * FROM notes WHERE id = $1', [noteId]);
+    console.log(result.rows);
 
-    if (!note) {
+    if (result.rows.length === 0) {
         return res.status(404).json({
             status: 'error',
             message: 'Note not found',
@@ -95,11 +96,11 @@ app.get('/notes/:id', (req, res) => {
 
     return res.json({
         status: 'success',
-        data: note,
+        data: result.rows[0],
     });
 });
 
-app.post('/notes', (req, res) => {
+app.post('/notes', async (req, res) => {
     const parsed = validateNoteBody(req.body?.title, req.body?.content);
     if (!parsed.ok) {
         return res.status(400).json({
@@ -108,21 +109,15 @@ app.post('/notes', (req, res) => {
         });
     }
 
-    const newId = Math.max(0, ...notes.map((n) => n.id)) + 1;
-    const newNote = {
-        id: newId,
-        title: parsed.title,
-        content: parsed.content,
-    };
-    notes.push(newNote);
+    const result = await pool.query('INSERT INTO notes (title, content) VALUES ($1, $2) RETURNING *', [parsed.title, parsed.content]);
 
     return res.status(201).json({
         status: 'success',
-        data: newNote,
+        data: result.rows[0],
     });
 });
 
-app.delete('/notes/:id', (req, res) => {
+app.delete('/notes/:id', async (req, res) => {
     const noteId = parseNoteIdParam(req.params.id);
 
     if (noteId === null) {
@@ -132,21 +127,12 @@ app.delete('/notes/:id', (req, res) => {
         });
     }
 
-    const note = notes.find((n) => n.id === noteId);
-
-    if (!note) {
-        return res.status(404).json({
-            status: 'error',
-            message: 'Note not found',
-        });
-    }
-
-    notes.splice(notes.indexOf(note), 1);
+    await pool.query('DELETE FROM notes WHERE id = $1', [noteId]);
 
     return res.status(204).send();
 });
 
-app.put('/notes/:id', (req, res) => {
+app.put('/notes/:id', async (req, res) => {
     const noteId = parseNoteIdParam(req.params.id);
 
     if (noteId === null) {
@@ -156,15 +142,15 @@ app.put('/notes/:id', (req, res) => {
         });
     }
 
-    const note = notes.find((n) => n.id === noteId);
+    const noteResult = await pool.query('SELECT * FROM notes WHERE id = $1', [noteId]);
 
-    if (!note) {
+    if (noteResult.rows.length === 0) {
         return res.status(404).json({
             status: 'error',
             message: 'Note not found',
         });
     }
-
+    
     const parsed = validateNoteBody(req.body?.title, req.body?.content);
     if (!parsed.ok) {
         return res.status(400).json({
@@ -173,12 +159,11 @@ app.put('/notes/:id', (req, res) => {
         });
     }
 
-    note.title = parsed.title;
-    note.content = parsed.content;
+    const result = await pool.query('UPDATE notes SET title = $1, content = $2 WHERE id = $3 RETURNING *', [parsed.title, parsed.content, noteId]);
 
     return res.json({
         status: 'success',
-        data: note,
+        data: result.rows[0],
     });
 });
 
