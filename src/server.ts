@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { NextFunction, Request, Response } from 'express';
 import { pool } from './db';
 
 const app = express();
@@ -10,15 +10,10 @@ pool.on('error', (err) => {
 
 app.use(express.json());
 
-const notes = [
-    { id: 1, title: 'Note 1', content: 'Learning Express' },
-    { id: 2, title: 'Note 2', content: 'Learn Routing' },
-];
-
 function parseNoteIdParam(id: string | undefined): number | null {
     if (id === undefined) return null;
     const noteId = Number(id);
-    return Number.isInteger(noteId) ? noteId : null;
+    return Number.isInteger(noteId) && noteId > 0 ? noteId : null;
 }
 
 type ValidateNoteResult = { ok: true; title: string; content: string } | { ok: false; message: string };
@@ -65,105 +60,140 @@ app.get('/health', async (_req, res) => {
 });
 
 
-app.get('/notes', async (_req, res) => {
-    const result = await pool.query('SELECT * FROM notes');
-    console.log(result.rows);
-    return res.json({
-        status: 'success',
-        data: result.rows,
-    });
+app.get('/notes', async (_req, res, next) => {
+    try {
+        const result = await pool.query('SELECT * FROM notes');
+        return res.json({
+            status: 'success',
+            data: result.rows,
+        });
+    } catch (error) {
+        next(error);
+    }
 });
 
-app.get('/notes/:id', async (req, res) => {
-    const noteId = parseNoteIdParam(req.params.id);
+app.get('/notes/:id', async (req, res, next) => {
+    try {
+        const noteId = parseNoteIdParam(req.params.id);
 
-    if (noteId === null) {
-        return res.status(400).json({
-            status: 'error',
-            message: 'Note id must be an integer',
+        if (noteId === null) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Note id must be a positive integer',
+            });
+        }
+
+        const result = await pool.query('SELECT * FROM notes WHERE id = $1', [noteId]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                status: 'error',
+                message: 'Note not found',
+            });
+        }
+
+        return res.json({
+            status: 'success',
+            data: result.rows[0],
         });
+    } catch (error) {
+        next(error);
     }
-
-    const result = await pool.query('SELECT * FROM notes WHERE id = $1', [noteId]);
-    console.log(result.rows);
-
-    if (result.rows.length === 0) {
-        return res.status(404).json({
-            status: 'error',
-            message: 'Note not found',
-        });
-    }
-
-    return res.json({
-        status: 'success',
-        data: result.rows[0],
-    });
 });
 
-app.post('/notes', async (req, res) => {
-    const parsed = validateNoteBody(req.body?.title, req.body?.content);
-    if (!parsed.ok) {
-        return res.status(400).json({
-            status: 'error',
-            message: parsed.message,
+app.post('/notes', async (req, res, next) => {
+    try {
+        const parsed = validateNoteBody(req.body?.title, req.body?.content);
+        if (!parsed.ok) {
+            return res.status(400).json({
+                status: 'error',
+                message: parsed.message,
+            });
+        }
+
+        const result = await pool.query('INSERT INTO notes (title, content) VALUES ($1, $2) RETURNING *', [parsed.title, parsed.content]);
+
+        return res.status(201).json({
+            status: 'success',
+            data: result.rows[0],
         });
+    } catch (error) {
+        next(error);
     }
-
-    const result = await pool.query('INSERT INTO notes (title, content) VALUES ($1, $2) RETURNING *', [parsed.title, parsed.content]);
-
-    return res.status(201).json({
-        status: 'success',
-        data: result.rows[0],
-    });
 });
 
-app.delete('/notes/:id', async (req, res) => {
-    const noteId = parseNoteIdParam(req.params.id);
+app.delete('/notes/:id', async (req, res, next) => {
+    try {
+        const noteId = parseNoteIdParam(req.params.id);
 
-    if (noteId === null) {
-        return res.status(400).json({
-            status: 'error',
-            message: 'Note id must be an integer',
-        });
+        if (noteId === null) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Note id must be a positive integer',
+            });
+        }
+
+        const result = await pool.query('DELETE FROM notes WHERE id = $1', [noteId]);
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({
+                status: 'error',
+                message: 'Note not found',
+            });
+        }
+
+        return res.status(204).send();
+    } catch (error) {
+        next(error);
     }
-
-    await pool.query('DELETE FROM notes WHERE id = $1', [noteId]);
-
-    return res.status(204).send();
 });
 
-app.put('/notes/:id', async (req, res) => {
-    const noteId = parseNoteIdParam(req.params.id);
+app.put('/notes/:id', async (req, res, next) => {
+    try {
+        const noteId = parseNoteIdParam(req.params.id);
 
-    if (noteId === null) {
-        return res.status(400).json({
-            status: 'error',
-            message: 'Note id must be an integer',
+        if (noteId === null) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Note id must be a positive integer',
+            });
+        }
+
+        const parsed = validateNoteBody(req.body?.title, req.body?.content);
+        if (!parsed.ok) {
+            return res.status(400).json({
+                status: 'error',
+                message: parsed.message,
+            });
+        }
+
+        const result = await pool.query(
+            'UPDATE notes SET title = $1, content = $2 WHERE id = $3 RETURNING *',
+            [parsed.title, parsed.content, noteId],
+        );
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({
+                status: 'error',
+                message: 'Note not found',
+            });
+        }
+
+        return res.json({
+            status: 'success',
+            data: result.rows[0],
         });
+    } catch (error) {
+        next(error);
     }
+});
 
-    const noteResult = await pool.query('SELECT * FROM notes WHERE id = $1', [noteId]);
-
-    if (noteResult.rows.length === 0) {
-        return res.status(404).json({
-            status: 'error',
-            message: 'Note not found',
-        });
-    }
-    
-    const parsed = validateNoteBody(req.body?.title, req.body?.content);
-    if (!parsed.ok) {
-        return res.status(400).json({
-            status: 'error',
-            message: parsed.message,
-        });
-    }
-
-    const result = await pool.query('UPDATE notes SET title = $1, content = $2 WHERE id = $3 RETURNING *', [parsed.title, parsed.content, noteId]);
-
-    return res.json({
-        status: 'success',
-        data: result.rows[0],
+// Global error handler - catches all errors passed via next(error)
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+    console.error(err);
+    res.status(500).json({
+        status: 'error',
+        message: 'Internal server error',
     });
 });
 
