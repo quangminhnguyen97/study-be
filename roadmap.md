@@ -120,16 +120,16 @@ src/
 
 ## Task
 
-- [ ] Tách route ra file riêng
-- [ ] Tách controller
-- [ ] Tách service
-- [ ] Tách repository (query DB)
-- [ ] Xử lý error chung
+- ✅ Tách route ra file riêng
+- ✅ Tách controller
+- ⏭️ Tách service (bỏ qua, logic notes hiện tại chưa đủ phức tạp để cần layer này)
+- ✅ Tách repository (query DB)
+- ✅ Xử lý error chung
 
 ## Kiến thức cần hiểu
 
-- separation of concerns
-- flow: route → controller → service → repo
+- ✅ separation of concerns
+- ✅ flow: route → controller → repo (service sẽ thêm vào phase sau khi có business logic phức tạp hơn)
 
 ---
 
