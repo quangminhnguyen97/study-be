@@ -1,6 +1,7 @@
 import { insertUser } from "../repositories/user.repository";
 import { validateLoginUser, validateLoginUserBody, validateRegisterUserBody } from "../utils/auth";
 import { NextFunction, Request, Response } from 'express';
+import { signAccessToken } from "../utils/jwt";
 
 
 
@@ -29,7 +30,20 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
         if (!result.ok) {
             return res.status(401).json({ status: 'error', message: result.message });
         }
-        return res.status(200).json({ status: 'success', data: result.user });
+
+        const token = signAccessToken({
+            userId: result.user.id,
+            email: result.user.email,
+        });
+
+        return res.status(200).json({
+            status: 'success',
+            data: {
+                token,
+                user: result.user,
+            },
+        });
+
     }
     catch (error) {
         next(error);

@@ -6,6 +6,7 @@ const requiredEnvs = [
   'DB_NAME',
   'DB_USER',
   'DB_PASSWORD',
+  'JWT_SECRET',
 ] as const;
 
 for (const key of requiredEnvs) {
@@ -20,4 +21,5 @@ export const pool = new Pool({
   database: process.env.DB_NAME,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
+
 });

@@ -1,6 +1,7 @@
 import express, { NextFunction, Request, Response } from 'express';
 import { pool } from './db';
 import noteRoutes from './routes/note.routes';
+import authRoutes from './routes/auth.routes';
 
 const app = express();
 
@@ -23,6 +24,8 @@ app.get('/health', async (_req, res) => {
 });
 
 app.use('/notes', noteRoutes);
+
+app.use('/auth', authRoutes);
 
 // ─── Global error handler ────────────────────────────────────────────────────
 
