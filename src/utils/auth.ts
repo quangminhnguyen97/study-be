@@ -80,7 +80,7 @@ export async function validateLoginUser(email: string, password: string) {
     if (!isPasswordValid) {
         return { ok: false, message: 'invalid email or password' };
     }
-    const { password: _, ...safeUser } = user;
+    const { password_hash: _, ...safeUser } = user;
     return { ok: true, user: safeUser };
 }
 
